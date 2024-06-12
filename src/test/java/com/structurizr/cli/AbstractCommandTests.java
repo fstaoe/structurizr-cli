@@ -2,6 +2,8 @@ package com.structurizr.cli;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 public class AbstractCommandTests {
@@ -12,7 +14,7 @@ public class AbstractCommandTests {
             new ValidateCommand().loadWorkspace("src/test/dsl");
             fail();
         } catch (Exception e) {
-            assertTrue(e.getMessage().endsWith("/src/test/dsl is not a JSON or DSL file"));
+            assertTrue(e.getMessage().endsWith("/src/test/dsl is not a JSON or DSL file".replace("/", File.separator)), e.getMessage());
         }
     }
 

@@ -1,30 +1,59 @@
-# This workflow will build a Java project with Gradle
-# For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-gradle
-
-name: Java CI with Gradle
-
+name: Structurizr CI
 on:
   push:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        java: [ '17' ]
-
+        os: [macos-latest, windows-latest, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Java
-        uses: actions/setup-java@v3
+      - uses: actions/checkout@v4
+      - uses: graalvm/setup-graalvm@v1
         with:
-          java-version: ${{ matrix.java }}
-          distribution: 'temurin'
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-      - name: Build with Gradle
+          java-version: 17
+          distribution: graalvm
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Test
         run: ./gradlew
+
+      - name: Compile
+        if: ${{ github.ref == 'refs/heads/master' }}
+        run: |
+          ./gradlew nativeCompile
+
+      - name: Verify on Windows
+        if: ${{ runner.os == 'windows' && github.ref == 'refs/heads/master' }}
+        run: |
+          ./build/native/nativeCompile/structurizr-cli.exe export -workspace ./examples/workspace.json -format plantuml -output ./build/diagrams
+          ./build/native/nativeCompile/structurizr-cli.exe export -workspace ./examples/workspace.json -format websequencediagrams -output ./build/diagrams
+          ./build/native/nativeCompile/structurizr-cli.exe export -workspace ./examples/workspace.json -format json -output ./build/diagrams
+          ./build/native/nativeCompile/structurizr-cli.exe export -workspace ./examples/workspace.json -format mermaid -output ./build/diagrams
+          ./build/native/nativeCompile/structurizr-cli.exe export -workspace ./examples/workspace.json -format plantuml/c4plantuml -output ./build/diagrams
+          ./build/native/nativeCompile/structurizr-cli.exe list -workspace ./examples/workspace.json
+          ./build/native/nativeCompile/structurizr-cli.exe validate -workspace ./examples/workspace.json
+          ./build/native/nativeCompile/structurizr-cli.exe inspect -workspace ./examples/workspace.json
+
+      - name: Verify on Non-Windows
+        if: ${{ runner.os != 'windows' && github.ref == 'refs/heads/master' }}
+        run: |
+          ./build/native/nativeCompile/structurizr-cli export -workspace ./examples/workspace.json -format plantuml -output ./build/diagrams
+          ./build/native/nativeCompile/structurizr-cli export -workspace ./examples/workspace.json -format websequencediagrams -output ./build/diagrams
+          ./build/native/nativeCompile/structurizr-cli export -workspace ./examples/workspace.json -format json -output ./build/diagrams
+          ./build/native/nativeCompile/structurizr-cli export -workspace ./examples/workspace.json -format mermaid -output ./build/diagrams
+          ./build/native/nativeCompile/structurizr-cli export -workspace ./examples/workspace.json -format plantuml/c4plantuml -output ./build/diagrams
+          ./build/native/nativeCompile/structurizr-cli list -workspace ./examples/workspace.json
+          ./build/native/nativeCompile/structurizr-cli validate -workspace ./examples/workspace.json
+          ./build/native/nativeCompile/structurizr-cli inspect -workspace ./examples/workspace.json
+
+      - uses: actions/upload-artifact@v4
+        name: Upload
+        if: ${{ success() && github.ref == 'refs/heads/master' }}
+        with:
+          name: structurizr-cli-${{ runner.os }}-${{ runner.arch }}
+          path: ./build/native/nativeCompile/structurizr-cli*

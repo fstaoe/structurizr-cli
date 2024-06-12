@@ -1,5 +1,8 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
 plugins {
 	id 'java'
+	id 'org.graalvm.buildtools.native' version '0.10.2'
 }
 
 defaultTasks 'clean', 'build', 'getDeps', 'buildZip'
@@ -31,10 +34,8 @@ dependencies {
 	implementation 'org.jruby:jruby-core:9.4.4.0'
 
 	implementation 'commons-logging:commons-logging:1.2'
-	implementation 'org.apache.logging.log4j:log4j-api:2.23.0'
-	implementation 'org.apache.logging.log4j:log4j-core:2.23.0'
-	implementation 'org.apache.logging.log4j:log4j-jcl:2.23.0'
-	implementation 'org.apache.logging.log4j:log4j-slf4j-impl:2.23.0'
+	implementation 'org.slf4j:jcl-over-slf4j:2.0.13'
+	implementation 'ch.qos.logback:logback-classic:1.5.6'
 
 	testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.9.2'
 
@@ -42,18 +43,30 @@ dependencies {
 
 test {
 	useJUnitPlatform()
+
+	testLogging {
+		events "failed" //, "passed", "skipped", "standardOut", "standardError"
+
+		showExceptions true
+		exceptionFormat "full"
+		showCauses true
+		showStackTraces true
+
+		showStandardStreams = false
+	}
 }
 
 sourceSets.main.resources {
 	srcDirs = ['src/main/resources']
 	include 'build.properties'
+	include 'META-INF/**'
 }
 
 jar {
     manifest {
         attributes(
                 'Implementation-Title': description,
-                'Implementation-Version': version
+                'Implementation-Version': archiveVersion
         )
     }
 }
@@ -80,5 +93,25 @@ task buildZip(type: Zip) {
 	from ('etc') {
 		include 'structurizr.sh'
 		include 'structurizr.bat'
+	}
+}
+
+graalvmNative {
+	def classpathSeparator = Os.isFamily(Os.FAMILY_WINDOWS) ? ";" : ":"
+	// Collect all JAR files from build/dependencies and build/libs
+	def dependenciesJars = fileTree(dir: 'build/dependencies', include: '*.jar').files
+	def libsJars = fileTree(dir: 'build/libs', include: '*.jar').files
+	def classpath = (dependenciesJars + libsJars).collect { it.absolutePath }.join(classpathSeparator)
+
+	testSupport = false
+	metadataRepository {
+		enabled = false
+	}
+
+	binaries {
+		main {
+			mainClass = "com.structurizr.cli.StructurizrCliApplication"
+			buildArgs.addAll("--verbose", "-J-Xmx7g", "-cp", classpath)
+		}
 	}
 }
